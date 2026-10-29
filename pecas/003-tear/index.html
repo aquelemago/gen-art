@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<!--
+    003 — Tear
+    Tecido de glifos 6×6 com uma faixa lisa cujas bordas esgarçam a cada quadro.
+
+    URL:    index.html?seed=12345
+    Teclas: S salva PNG · R nova seed · Espaço pausa/continua
+    Captura: ?passos=N&solo=1 (ferramentas/renderizar.sh) · ?capture=1 + window.step(n)
+-->
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>003 — Tear</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.7.0/p5.min.js"></script>
+    <style>
+        :root {
+            --fundo: #c5c8d0;
+            --preto: #000000;
+            --grafite: #505050;
+            --ambar: #feb600;
+            --lilas: #9a6cf0;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: ui-monospace, 'JetBrains Mono', 'Courier New', monospace;
+            background: var(--fundo);
+            color: var(--preto);
+            min-height: 100vh;
+        }
+        .container { display: flex; gap: 24px; padding: 24px; min-height: 100vh; }
+        .sidebar {
+            width: 260px; flex-shrink: 0;
+            background: var(--preto); color: #fff;
+            padding: 20px;
+            align-self: flex-start;
+        }
+        .sidebar h1 { font-size: 20px; font-weight: 600; margin-bottom: 6px; }
+        .sidebar .sub { font-size: 13px; line-height: 1.5; color: #ddd; margin-bottom: 24px; }
+        .sidebar h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--ambar); margin: 20px 0 10px; }
+        input[type=number] {
+            width: 100%; padding: 8px; font: inherit; font-size: 14px; text-align: center;
+            background: var(--grafite); color: #fff; border: 0; margin-bottom: 8px;
+        }
+        input[type=number]:focus { outline: 2px solid var(--ambar); }
+        .row { display: flex; gap: 6px; margin-bottom: 6px; }
+        button {
+            flex: 1; padding: 8px; font: inherit; font-size: 13px; cursor: pointer;
+            background: var(--ambar); color: var(--preto); border: 0;
+        }
+        button.alt { background: var(--lilas); color: #fff; }
+        button:hover { filter: brightness(1.08); }
+        .swatches { display: flex; gap: 4px; }
+        .swatches span { flex: 1; height: 22px; border: 1px solid #333; }
+        .status { font-size: 13px; color: #ddd; margin-top: 12px; }
+        .keys { font-size: 12px; color: #ccc; margin-top: 16px; line-height: 1.6; }
+        .canvas-area { flex: 1; display: flex; align-items: flex-start; justify-content: center; min-width: 0; }
+        #canvas-container { width: 100%; max-width: min(1152px, calc((100vh - 48px) * 1.0667)); }
+        #canvas-container canvas { display: block; width: 100% !important; height: auto !important; image-rendering: pixelated; }
+        body.solo .sidebar { display: none; }
+        body.solo .container, body.solo .canvas-area { display: block; padding: 0; }
+        body.solo #canvas-container { max-width: none; width: auto; }
+        body.solo #canvas-container canvas { width: auto !important; height: auto !important; }
+        @media (max-width: 700px) {
+            .container { flex-direction: column; padding: 16px; }
+            .sidebar { width: 100%; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="sidebar">
+            <h1>003 — Tear</h1>
+            <div class="sub">Um tecido de glifos de 6×6. Uma faixa lisa atravessa a trama e as bordas dela esgarçam a cada quadro.</div>
+
+            <h2>Seed</h2>
+            <input type="number" id="seed-input" value="1" onchange="updateSeed()">
+            <div class="row">
+                <button class="alt" onclick="previousSeed()">← ant.</button>
+                <button class="alt" onclick="nextSeed()">próx. →</button>
+            </div>
+            <div class="row"><button onclick="randomSeedAndUpdate()">↻ aleatória</button></div>
+
+            <h2>Paleta</h2>
+            <div class="swatches">
+                <span style="background:#c5c8d0"></span><span style="background:#000"></span>
+                <span style="background:#505050"></span><span style="background:#fff"></span>
+                <span style="background:#feb600"></span><span style="background:#9a6cf0"></span>
+            </div>
+
+            <h2>Ações</h2>
+            <div class="row">
+                <button onclick="alternarPausa()">pausar</button>
+                <button onclick="savePNG()">PNG</button>
+            </div>
+            <div class="status" id="status">—</div>
+            <div class="keys">S salva PNG · R nova seed · espaço pausa</div>
+        </div>
+        <div class="canvas-area">
+            <div id="canvas-container"></div>
+        </div>
+    </div>
+    <script src="sketch.js"></script>
+</body>
+</html>

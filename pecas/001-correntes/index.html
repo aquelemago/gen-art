@@ -1,0 +1,821 @@
+<!DOCTYPE html>
+<!--
+    001 — Correntes
+    Flow field noturno: partículas seguindo um campo de correntes sem divergência
+    (curl de ruído Perlin com domain warp), rastros somados como luz.
+    Baseado em .claude/skills/algorithmic-art/templates/viewer.html.
+
+    URL:    index.html?seed=12345
+    Teclas: S salva PNG · R nova seed · Espaço redesenha
+    Captura: ?capture=1 pausa o loop; window.step(n) avança n quadros.
+-->
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>001 — Correntes</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.7.0/p5.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&family=Lora:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        /* Anthropic Brand Colors */
+        :root {
+            --anthropic-dark: #141413;
+            --anthropic-light: #faf9f5;
+            --anthropic-mid-gray: #b0aea5;
+            --anthropic-light-gray: #e8e6dc;
+            --anthropic-orange: #d97757;
+            --anthropic-blue: #6a9bcc;
+            --anthropic-green: #788c5d;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Poppins', sans-serif;
+            background: linear-gradient(135deg, var(--anthropic-light) 0%, #f5f3ee 100%);
+            min-height: 100vh;
+            color: var(--anthropic-dark);
+        }
+
+        .container {
+            display: flex;
+            min-height: 100vh;
+            padding: 20px;
+            gap: 20px;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            width: 320px;
+            flex-shrink: 0;
+            background: #fff;
+            padding: 24px;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(20, 20, 19, 0.1);
+            overflow-y: auto;
+            overflow-x: hidden;
+        }
+
+        .sidebar h1 {
+            font-family: 'Lora', serif;
+            font-size: 24px;
+            font-weight: 500;
+            color: var(--anthropic-dark);
+            margin-bottom: 8px;
+        }
+
+        .sidebar .subtitle {
+            color: var(--anthropic-mid-gray);
+            font-size: 14px;
+            margin-bottom: 32px;
+            line-height: 1.4;
+        }
+
+        /* Control Sections */
+        .control-section {
+            margin-bottom: 32px;
+        }
+
+        .control-section h3 {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--anthropic-dark);
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .control-section h3::before {
+            content: '•';
+            color: var(--anthropic-orange);
+            font-weight: bold;
+        }
+
+        /* Seed Controls */
+        .seed-input {
+            width: 100%;
+            background: var(--anthropic-light);
+            padding: 12px;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            margin-bottom: 12px;
+            border: 1px solid var(--anthropic-light-gray);
+            text-align: center;
+        }
+
+        .seed-input:focus {
+            outline: none;
+            border-color: var(--anthropic-orange);
+            box-shadow: 0 0 0 2px rgba(217, 119, 87, 0.1);
+            background: white;
+        }
+
+        .seed-controls {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+
+        .regen-button {
+            margin-bottom: 0;
+        }
+
+        /* Parameter Controls */
+        .control-group {
+            margin-bottom: 20px;
+        }
+
+        .control-group label {
+            display: block;
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--anthropic-dark);
+            margin-bottom: 8px;
+        }
+
+        .slider-container {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .slider-container input[type="range"] {
+            flex: 1;
+            height: 4px;
+            background: var(--anthropic-light-gray);
+            border-radius: 2px;
+            outline: none;
+            -webkit-appearance: none;
+        }
+
+        .slider-container input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 16px;
+            height: 16px;
+            background: var(--anthropic-orange);
+            border-radius: 50%;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .slider-container input[type="range"]::-webkit-slider-thumb:hover {
+            transform: scale(1.1);
+            background: #c86641;
+        }
+
+        .slider-container input[type="range"]::-moz-range-thumb {
+            width: 16px;
+            height: 16px;
+            background: var(--anthropic-orange);
+            border-radius: 50%;
+            border: none;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .value-display {
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            color: var(--anthropic-mid-gray);
+            min-width: 60px;
+            text-align: right;
+        }
+
+        /* Palette swatches (fixed palette, read-only) */
+        .swatches {
+            display: flex;
+            gap: 6px;
+        }
+
+        .swatch {
+            flex: 1;
+            height: 28px;
+            border-radius: 6px;
+            border: 1px solid var(--anthropic-light-gray);
+        }
+
+        /* Buttons */
+        .button {
+            background: var(--anthropic-orange);
+            color: white;
+            border: none;
+            padding: 10px 16px;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            width: 100%;
+        }
+
+        .button:hover {
+            background: #c86641;
+            transform: translateY(-1px);
+        }
+
+        .button:active {
+            transform: translateY(0);
+        }
+
+        .button.secondary {
+            background: var(--anthropic-blue);
+        }
+
+        .button.secondary:hover {
+            background: #5a8bb8;
+        }
+
+        .button.tertiary {
+            background: var(--anthropic-green);
+        }
+
+        .button.tertiary:hover {
+            background: #6b7b52;
+        }
+
+        .button-row {
+            display: flex;
+            gap: 8px;
+        }
+
+        .button-row .button {
+            flex: 1;
+        }
+
+        .status {
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            color: var(--anthropic-mid-gray);
+            margin-top: 12px;
+        }
+
+        /* Canvas Area */
+        .canvas-area {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 0;
+        }
+
+        #canvas-container {
+            width: 100%;
+            /* keep the 4:5 canvas inside the viewport */
+            max-width: min(1000px, calc((100vh - 80px) * 0.8));
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 20px 40px rgba(20, 20, 19, 0.1);
+            background: #04070a;
+        }
+
+        #canvas-container canvas {
+            display: block;
+            width: 100% !important;
+            height: auto !important;
+        }
+
+        /* Loading State */
+        .loading {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            color: var(--anthropic-mid-gray);
+        }
+
+        /* Responsive - Stack on mobile */
+        @media (max-width: 600px) {
+            .container {
+                flex-direction: column;
+            }
+
+            .sidebar {
+                width: 100%;
+            }
+
+            .canvas-area {
+                padding: 20px;
+            }
+
+            #canvas-container {
+                max-width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Control Sidebar -->
+        <div class="sidebar">
+            <h1>001 — Correntes</h1>
+            <div class="subtitle">Fios de luz sobre água escura. Correntes sem divergência, massas d'água que carregam a própria cor.</div>
+
+            <!-- Seed Section -->
+            <div class="control-section">
+                <h3>Seed</h3>
+                <input type="number" id="seed-input" class="seed-input" value="1" onchange="updateSeed()">
+                <div class="seed-controls">
+                    <button class="button secondary" onclick="previousSeed()">← Prev</button>
+                    <button class="button secondary" onclick="nextSeed()">Next →</button>
+                </div>
+                <button class="button tertiary regen-button" onclick="randomSeedAndUpdate()">↻ Random</button>
+            </div>
+
+            <!-- Parameters Section -->
+            <div class="control-section">
+                <h3>Parâmetros</h3>
+
+                <div class="control-group">
+                    <label>Partículas</label>
+                    <div class="slider-container">
+                        <input type="range" id="particles" min="500" max="12000" step="500" value="5000" oninput="updateParam('particles', this.value)">
+                        <span class="value-display" id="particles-value">5000</span>
+                    </div>
+                </div>
+
+                <div class="control-group">
+                    <label>Escala do ruído</label>
+                    <div class="slider-container">
+                        <input type="range" id="noiseScale" min="0.5" max="5" step="0.1" value="1.2" oninput="updateParam('noiseScale', this.value)">
+                        <span class="value-display" id="noiseScale-value">1.2</span>
+                    </div>
+                </div>
+
+                <div class="control-group">
+                    <label>Velocidade</label>
+                    <div class="slider-container">
+                        <input type="range" id="speed" min="0.3" max="4" step="0.1" value="1.6" oninput="updateParam('speed', this.value)">
+                        <span class="value-display" id="speed-value">1.6</span>
+                    </div>
+                </div>
+
+                <div class="control-group">
+                    <label>Espessura do rastro</label>
+                    <div class="slider-container">
+                        <input type="range" id="weight" min="0.2" max="3" step="0.1" value="0.7" oninput="updateParam('weight', this.value)">
+                        <span class="value-display" id="weight-value">0.7</span>
+                    </div>
+                </div>
+
+                <div class="control-group">
+                    <label>Opacidade do rastro</label>
+                    <div class="slider-container">
+                        <input type="range" id="opacity" min="0.01" max="0.3" step="0.01" value="0.1" oninput="updateParam('opacity', this.value)">
+                        <span class="value-display" id="opacity-value">0.1</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Colors Section (fixed palette: Bioluminescência) -->
+            <div class="control-section">
+                <h3>Paleta</h3>
+                <div class="swatches" id="swatches"></div>
+            </div>
+
+            <!-- Actions Section -->
+            <div class="control-section">
+                <h3>Ações</h3>
+                <div class="button-row">
+                    <button class="button" onclick="regenerate()">Redesenhar</button>
+                    <button class="button" onclick="resetParameters()">Reset</button>
+                </div>
+                <div class="button-row" style="margin-top: 8px;">
+                    <button class="button tertiary" onclick="savePNG()">Baixar PNG</button>
+                </div>
+                <div class="status" id="status">—</div>
+            </div>
+        </div>
+
+        <!-- Main Canvas Area -->
+        <div class="canvas-area">
+            <div id="canvas-container">
+                <div class="loading">Inicializando…</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ═══════════════════════════════════════════════════════════════════════
+        // CONSTANTES DA OBRA
+        // ═══════════════════════════════════════════════════════════════════════
+
+        const W = 1080, H = 1350;
+        const MAX_FRAMES = 900;          // a obra "assenta" após 15 s a 60 fps
+        const CELL = 6;                  // resolução da grade do campo, em px
+
+        // Paleta Bioluminescência. Cada cor de rastro é uma massa d'água.
+        // As quatro frias saem de um ruído de "temperatura", repartido por
+        // quantis (MASS_SHARE); o âmbar é um núcleo quente raro, sua própria máscara.
+        const PALETTE = {
+            bg: '#04070a',
+            trails: ['#15535c', '#2f9e9a', '#8fd6cf', '#e8f4ef', '#e0a458'],
+        };
+        const MASS_SHARE = [0.30, 0.62, 0.86];   // quantis entre as massas frias
+        const WARM_SHARE = 0.18;                 // fração da zona iluminada com núcleo quente
+        const WARM_LIGHT = 0.6;                  // o âmbar só nasce onde a luz passa disso
+        const MASS_GAIN = [1, 1, 1, 0.8, 1];     // a espuma branca recua: o pico é ciano
+        const WARP = 1.2;                        // amplitude do domain warp
+        const DRIFT = 0.3;                       // deriva global (fração da corrente rápida)
+        const STILL = 0.08;                      // abaixo disso a água está parada
+        const FOCUS_SPAWN = 0.6;                 // fração de nascimentos guiados pela luz
+        const FOCUS_MARGIN = 0.22;               // o foco fica no interior (fração do lado)
+        const TIERS = [0.55, 0.78, 1.0];         // alfa relativo por nível de luz
+
+        // ═══════════════════════════════════════════════════════════════════════
+        // PARÂMETROS
+        // ═══════════════════════════════════════════════════════════════════════
+
+        let params = {
+            seed: readSeedFromURL(),
+            particles: 5000,
+            noiseScale: 1.2,   // nº aproximado de giros ao longo do lado menor
+            speed: 1.6,        // px por quadro na corrente mais forte (a 1080 px)
+            weight: 0.7,       // espessura do rastro (a 1080 px)
+            opacity: 0.1,      // alfa de cada segmento; a luz se soma
+        };
+
+        const defaultParams = { ...params };
+        const captureMode = new URLSearchParams(location.search).has('capture');
+
+        // ═══════════════════════════════════════════════════════════════════════
+        // ESTADO
+        // ═══════════════════════════════════════════════════════════════════════
+
+        let u;                     // unidade: lado menor / 1080
+        let cols, rows;
+        let fieldX, fieldY;        // velocidade do campo por célula
+        let massGrid;              // massa d'água (0..4) por célula
+        let light;                 // luz 0..1 (foco × vinheta) por célula
+        let fieldKey = '';         // seed|escala do campo em cache
+        let px, py, life, mass;    // partículas (struct-of-arrays)
+        let dith;                  // dither por partícula: suaviza a troca de nível de luz
+        let strokeStyles;          // rgba por massa × nível de luz
+        let frame = 0;
+
+        // ═══════════════════════════════════════════════════════════════════════
+        // CAMPO DE CORRENTES
+        // Função de corrente ψ = ruído com domain warp; velocidade = curl(ψ),
+        // que tem divergência zero: a água não se acumula nem some. Uma deriva
+        // constante (também sem divergência) alonga os giros em correntes.
+        // ═══════════════════════════════════════════════════════════════════════
+
+        function quantile(values, q) {
+            const s = Float32Array.from(values).sort();
+            return s[Math.min(s.length - 1, Math.floor(s.length * q))];
+        }
+
+        function buildField(driftAngle) {
+            cols = Math.ceil(W / CELL) + 4;
+            rows = Math.ceil(H / CELL) + 4;
+            const S = Math.min(W, H);
+            const k = params.noiseScale / S;
+            const size = cols * rows;
+            const psi = new Float32Array(size);
+            const temp = new Float32Array(size);
+            const warm = new Float32Array(size);
+            const focus = new Float32Array(size);
+
+            for (let j = 0; j < rows; j++) {
+                for (let i = 0; i < cols; i++) {
+                    const id = j * cols + i;
+                    const X = (i - 1) * CELL, Y = (j - 1) * CELL;
+                    const x = X * k, y = Y * k;
+                    const wx = noise(x * 0.5 + 17.3, y * 0.5 + 4.1);
+                    const wy = noise(x * 0.5 + 91.7, y * 0.5 + 33.9);
+                    psi[id] = noise(x + WARP * wx, y + WARP * wy);
+                    temp[id] = noise(x * 0.55 + 512.5, y * 0.55 + 256.25, 3.7);
+                    warm[id] = noise(X / S * 0.6 + 71.1, Y / S * 0.6 + 7.7, 9.1);
+                    focus[id] = noise(X / S * 0.5 + 300.3, Y / S * 0.5 + 150.7, 5.3);
+                }
+            }
+
+            // velocidade = curl(ψ), normalizada pelo percentil 90 + deriva
+            fieldX = new Float32Array(size);
+            fieldY = new Float32Array(size);
+            const mags = [];
+            for (let j = 1; j < rows - 1; j++) {
+                for (let i = 1; i < cols - 1; i++) {
+                    const id = j * cols + i;
+                    const vx = (psi[id + cols] - psi[id - cols]) * 0.5;
+                    const vy = -(psi[id + 1] - psi[id - 1]) * 0.5;
+                    fieldX[id] = vx;
+                    fieldY[id] = vy;
+                    if ((i + j) % 7 === 0) mags.push(Math.sqrt(vx * vx + vy * vy));
+                }
+            }
+            const ref = quantile(mags, 0.9) || 1;
+            const dx = DRIFT * Math.cos(driftAngle), dy = DRIFT * Math.sin(driftAngle);
+            for (let n = 0; n < size; n++) {
+                fieldX[n] = fieldX[n] / ref + dx;
+                fieldY[n] = fieldY[n] / ref + dy;
+            }
+
+            // massas d'água: quantis da temperatura; âmbar onde a máscara quente é máxima
+            const t1 = quantile(temp, MASS_SHARE[0]);
+            const t2 = quantile(temp, MASS_SHARE[1]);
+            const t3 = quantile(temp, MASS_SHARE[2]);
+            massGrid = new Uint8Array(size);
+            for (let n = 0; n < size; n++) {
+                const t = temp[n];
+                massGrid[n] = t < t1 ? 0 : t < t2 ? 1 : t < t3 ? 2 : 3;
+            }
+
+            // luz: foco de baixa frequência × vinheta, normalizado 0..1
+            for (let j = 0; j < rows; j++) {
+                for (let i = 0; i < cols; i++) {
+                    const wx = Math.min((i - 1) * CELL, W - (i - 1) * CELL) / (FOCUS_MARGIN * W);
+                    const wy = Math.min((j - 1) * CELL, H - (j - 1) * CELL) / (FOCUS_MARGIN * H);
+                    const win = constrain(Math.min(wx, wy), 0, 1);
+                    focus[j * cols + i] *= win * win * (3 - 2 * win);
+                }
+            }
+            const f0 = quantile(focus, 0.05), f1 = quantile(focus, 0.95);
+            light = new Float32Array(size);
+            for (let j = 0; j < rows; j++) {
+                for (let i = 0; i < cols; i++) {
+                    const id = j * cols + i;
+                    const ex = Math.min((i - 1) * CELL, W - (i - 1) * CELL) / (0.1 * S);
+                    const ey = Math.min((j - 1) * CELL, H - (j - 1) * CELL) / (0.1 * S);
+                    const edge = 0.7 + 0.3 * constrain(Math.min(ex, ey), 0, 1);
+                    const f = constrain((focus[id] - f0) / (f1 - f0), 0, 1);
+                    const l = f * edge;
+                    light[id] = l;
+                }
+            }
+
+            // núcleo quente: o topo da máscara quente, só dentro da zona iluminada
+            const lit = [];
+            for (let n = 0; n < size; n++) if (light[n] > WARM_LIGHT) lit.push(warm[n]);
+            const tw = lit.length ? quantile(lit, 1 - WARM_SHARE) : Infinity;
+            for (let n = 0; n < size; n++) {
+                if (light[n] > WARM_LIGHT && warm[n] > tw) massGrid[n] = 4;
+            }
+        }
+
+        function cellAt(x, y) {
+            return ((y / CELL + 1) | 0) * cols + ((x / CELL + 1) | 0);
+        }
+
+        // ═══════════════════════════════════════════════════════════════════════
+        // PARTÍCULAS
+        // Cada nascimento consome sempre a mesma sequência de random():
+        // escolha do modo, até 8 pares (x, y, aceite), a vida e o dither.
+        // ═══════════════════════════════════════════════════════════════════════
+
+        function spawn(n) {
+            let x = random(W), y = random(H);
+            if (random() < FOCUS_SPAWN) {
+                for (let tries = 0; tries < 8; tries++) {
+                    const l = light[cellAt(x, y)];
+                    if (random() < l * l) break;
+                    x = random(W);
+                    y = random(H);
+                }
+            }
+            px[n] = x;
+            py[n] = y;
+            life[n] = Math.floor(random(80, 320));
+            dith[n] = random();
+            mass[n] = massGrid[cellAt(x, y)];
+        }
+
+        function initializeSystem() {
+            randomSeed(params.seed);
+            noiseSeed(params.seed);
+            noiseDetail(4, 0.5);
+
+            u = Math.min(W, H) / 1080;
+            const driftAngle = random(TWO_PI);
+            const key = `${params.seed}|${params.noiseScale}`;
+            if (key !== fieldKey) {
+                buildField(driftAngle);
+                fieldKey = key;
+            }
+
+            const N = params.particles;
+            px = new Float32Array(N);
+            py = new Float32Array(N);
+            life = new Int32Array(N);
+            mass = new Uint8Array(N);
+            dith = new Float32Array(N);
+            for (let n = 0; n < N; n++) spawn(n);
+
+            strokeStyles = [];
+            for (let m = 0; m < PALETTE.trails.length; m++) {
+                const c = color(PALETTE.trails[m]);
+                for (const t of TIERS) {
+                    const a = params.opacity * t * MASS_GAIN[m];
+                    strokeStyles.push(`rgba(${red(c)}, ${green(c)}, ${blue(c)}, ${a})`);
+                }
+            }
+
+            const ctx = drawingContext;
+            ctx.globalCompositeOperation = 'source-over';
+            background(PALETTE.bg);
+
+            frame = 0;
+            window.rendered = null;
+            if (!captureMode) loop();
+            updateStatus();
+        }
+
+        // ═══════════════════════════════════════════════════════════════════════
+        // P5.JS
+        // ═══════════════════════════════════════════════════════════════════════
+
+        function setup() {
+            const canvas = createCanvas(W, H);
+            canvas.parent('canvas-container');
+            pixelDensity(1);
+            document.querySelector('.loading').style.display = 'none';
+
+            renderSwatches();
+            updateSeedDisplay();
+            initializeSystem();
+            if (captureMode) noLoop();
+        }
+
+        function draw() {
+            if (frame >= MAX_FRAMES) return;
+
+            const ctx = drawingContext;
+            const N = params.particles;
+            const step = params.speed * u;
+            const _px = px, _py = py, _life = life, _mass = mass;
+            const _fx = fieldX, _fy = fieldY, _light = light, _dith = dith, _cols = cols;
+            const paths = strokeStyles.map(() => new Path2D());
+
+            for (let n = 0; n < N; n++) {
+                const x = _px[n], y = _py[n];
+
+                // bilinear sobre a grade (a célula 1 corresponde a x = 0)
+                const gx = x / CELL + 1, gy = y / CELL + 1;
+                const i = gx | 0, j = gy | 0;
+                const fx = gx - i, fy = gy - j;
+                const id = j * _cols + i;
+                let a0 = _fx[id], a1 = _fx[id + 1], b0 = _fx[id + _cols], b1 = _fx[id + _cols + 1];
+                let top = fx * (a1 - a0) + a0, bot = fx * (b1 - b0) + b0;
+                const vx = fy * (bot - top) + top;
+                a0 = _fy[id]; a1 = _fy[id + 1]; b0 = _fy[id + _cols]; b1 = _fy[id + _cols + 1];
+                top = fx * (a1 - a0) + a0; bot = fx * (b1 - b0) + b0;
+                const vy = fy * (bot - top) + top;
+
+                const nx = x + vx * step, ny = y + vy * step;
+                _life[n]--;
+
+                if (_life[n] <= 0 || vx * vx + vy * vy < STILL * STILL ||
+                    nx < 0 || nx >= W || ny < 0 || ny >= H) {
+                    spawn(n);
+                    continue;
+                }
+
+                // nível de luz 0..2 com dither, para não marcar a grade
+                const tier = Math.min(2, (_light[id] * 2.4 + _dith[n] * 0.9 - 0.15) | 0);
+                const p = paths[_mass[n] * 3 + tier];
+                p.moveTo(x, y);
+                p.lineTo(nx, ny);
+                _px[n] = nx;
+                _py[n] = ny;
+            }
+
+            ctx.globalCompositeOperation = 'lighter';
+            ctx.lineWidth = params.weight * u;
+            ctx.lineCap = 'butt';
+            for (let m = 0; m < paths.length; m++) {
+                ctx.strokeStyle = strokeStyles[m];
+                ctx.stroke(paths[m]);
+            }
+            ctx.globalCompositeOperation = 'source-over';
+
+            frame++;
+            if (frame % 30 === 0 || frame === MAX_FRAMES) updateStatus();
+            if (frame >= MAX_FRAMES) {
+                window.rendered = drawingContext.canvas;
+                if (!captureMode) noLoop();
+            }
+        }
+
+        // modo captura: avança n quadros de forma síncrona e determinística
+        window.step = (n = 1) => {
+            for (let k = 0; k < n && frame < MAX_FRAMES; k++) redraw();
+            return frame;
+        };
+
+        // ═══════════════════════════════════════════════════════════════════════
+        // UI
+        // ═══════════════════════════════════════════════════════════════════════
+
+        let restartTimer = null;
+
+        function updateParam(paramName, value) {
+            params[paramName] = parseFloat(value);
+            document.getElementById(`${paramName}-value`).textContent = value;
+            clearTimeout(restartTimer);
+            restartTimer = setTimeout(initializeSystem, 250);
+        }
+
+        function renderSwatches() {
+            const el = document.getElementById('swatches');
+            el.innerHTML = '';
+            [PALETTE.bg, ...PALETTE.trails].forEach((hex) => {
+                const s = document.createElement('div');
+                s.className = 'swatch';
+                s.style.background = hex;
+                s.title = hex;
+                el.appendChild(s);
+            });
+        }
+
+        function updateStatus() {
+            document.getElementById('status').textContent =
+                `quadro ${frame}/${MAX_FRAMES} · seed ${params.seed}`;
+        }
+
+        function regenerate() {
+            initializeSystem();
+        }
+
+        function savePNG() {
+            saveCanvas(`001-correntes-seed${params.seed}`, 'png');
+        }
+
+        function keyPressed(e) {
+            if (e && e.target && e.target.matches && e.target.matches('input, textarea')) return;
+            if (key === 's' || key === 'S') savePNG();
+            else if (key === 'r' || key === 'R') randomSeedAndUpdate();
+            else if (key === ' ') { regenerate(); return false; }
+        }
+
+        // ═══════════════════════════════════════════════════════════════════════
+        // SEED
+        // ═══════════════════════════════════════════════════════════════════════
+
+        function readSeedFromURL() {
+            const s = parseInt(new URLSearchParams(location.search).get('seed'), 10);
+            // único uso legítimo de Math.random: escolher QUAL obra ver, nunca como desenhá-la
+            return s > 0 ? s : Math.floor(Math.random() * 999999) + 1;
+        }
+
+        function writeSeedToURL() {
+            try {
+                const url = new URL(location.href);
+                url.searchParams.set('seed', params.seed);
+                history.replaceState(null, '', url);
+            } catch (e) { /* file:// em alguns navegadores */ }
+        }
+
+        function updateSeedDisplay() {
+            document.getElementById('seed-input').value = params.seed;
+            writeSeedToURL();
+        }
+
+        function updateSeed() {
+            const newSeed = parseInt(document.getElementById('seed-input').value, 10);
+            if (newSeed > 0) {
+                params.seed = newSeed;
+                updateSeedDisplay();
+                initializeSystem();
+            } else {
+                updateSeedDisplay();
+            }
+        }
+
+        function previousSeed() {
+            params.seed = Math.max(1, params.seed - 1);
+            updateSeedDisplay();
+            initializeSystem();
+        }
+
+        function nextSeed() {
+            params.seed = params.seed + 1;
+            updateSeedDisplay();
+            initializeSystem();
+        }
+
+        function randomSeedAndUpdate() {
+            params.seed = Math.floor(Math.random() * 999999) + 1;
+            updateSeedDisplay();
+            initializeSystem();
+        }
+
+        function resetParameters() {
+            const seed = params.seed;
+            params = { ...defaultParams, seed };
+            for (const k of ['particles', 'noiseScale', 'speed', 'weight', 'opacity']) {
+                document.getElementById(k).value = params[k];
+                document.getElementById(`${k}-value`).textContent = params[k];
+            }
+            initializeSystem();
+        }
+    </script>
+</body>
+</html>

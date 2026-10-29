@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<!--
+    001 — Correntes
+    Flow field noturno: partículas seguindo um campo de correntes sem divergência
+    (curl de ruído Perlin com domain warp), rastros somados como luz.
+    Baseado em .claude/skills/algorithmic-art/templates/viewer.html.
+
+    URL:    index.html?seed=12345
+    Teclas: S salva PNG · R nova seed · Espaço redesenha
+    Captura: ?capture=1 pausa o loop; window.step(n) avança n quadros.
+-->
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>002 — Glossa</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.7.0/p5.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&family=Lora:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        /* Anthropic Brand Colors */
+        :root {
+            --anthropic-dark: #141413;
+            --anthropic-light: #faf9f5;
+            --anthropic-mid-gray: #b0aea5;
+            --anthropic-light-gray: #e8e6dc;
+            --anthropic-orange: #d97757;
+            --anthropic-blue: #6a9bcc;
+            --anthropic-green: #788c5d;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Poppins', sans-serif;
+            background: linear-gradient(135deg, var(--anthropic-light) 0%, #f5f3ee 100%);
+            min-height: 100vh;
+            color: var(--anthropic-dark);
+        }
+
+        .container {
+            display: flex;
+            min-height: 100vh;
+            padding: 20px;
+            gap: 20px;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            width: 320px;
+            flex-shrink: 0;
+            background: #fff;
+            padding: 24px;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(20, 20, 19, 0.1);
+            overflow-y: auto;
+            overflow-x: hidden;
+        }
+
+        .sidebar h1 {
+            font-family: 'Lora', serif;
+            font-size: 24px;
+            font-weight: 500;
+            color: var(--anthropic-dark);
+            margin-bottom: 8px;
+        }
+
+        .sidebar .subtitle {
+            color: var(--anthropic-mid-gray);
+            font-size: 14px;
+            margin-bottom: 32px;
+            line-height: 1.4;
+        }
+
+        /* Control Sections */
+        .control-section {
+            margin-bottom: 32px;
+        }
+
+        .control-section h3 {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--anthropic-dark);
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .control-section h3::before {
+            content: '•';
+            color: var(--anthropic-orange);
+            font-weight: bold;
+        }
+
+        /* Seed Controls */
+        .seed-input {
+            width: 100%;
+            background: var(--anthropic-light);
+            padding: 12px;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            margin-bottom: 12px;
+            border: 1px solid var(--anthropic-light-gray);
+            text-align: center;
+        }
+
+        .seed-input:focus {
+            outline: none;
+            border-color: var(--anthropic-orange);
+            box-shadow: 0 0 0 2px rgba(217, 119, 87, 0.1);
+            background: white;
+        }
+
+        .seed-controls {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+
+        .regen-button {
+            margin-bottom: 0;
+        }
+
+        /* Parameter Controls */
+        .control-group {
+            margin-bottom: 20px;
+        }
+
+        .control-group label {
+            display: block;
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--anthropic-dark);
+            margin-bottom: 8px;
+        }
+
+        .slider-container {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .slider-container input[type="range"] {
+            flex: 1;
+            height: 4px;
+            background: var(--anthropic-light-gray);
+            border-radius: 2px;
+            outline: none;
+            -webkit-appearance: none;
+        }
+
+        .slider-container input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 16px;
+            height: 16px;
+            background: var(--anthropic-orange);
+            border-radius: 50%;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .slider-container input[type="range"]::-webkit-slider-thumb:hover {
+            transform: scale(1.1);
+            background: #c86641;
+        }
+
+        .slider-container input[type="range"]::-moz-range-thumb {
+            width: 16px;
+            height: 16px;
+            background: var(--anthropic-orange);
+            border-radius: 50%;
+            border: none;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .value-display {
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            color: var(--anthropic-mid-gray);
+            min-width: 60px;
+            text-align: right;
+        }
+
+        /* Palette swatches (fixed palette, read-only) */
+        .swatches {
+            display: flex;
+            gap: 6px;
+        }
+
+        .swatch {
+            flex: 1;
+            height: 28px;
+            border-radius: 6px;
+            border: 1px solid var(--anthropic-light-gray);
+        }
+
+        /* Buttons */
+        .button {
+            background: var(--anthropic-orange);
+            color: white;
+            border: none;
+            padding: 10px 16px;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            width: 100%;
+        }
+
+        .button:hover {
+            background: #c86641;
+            transform: translateY(-1px);
+        }
+
+        .button:active {
+            transform: translateY(0);
+        }
+
+        .button.secondary {
+            background: var(--anthropic-blue);
+        }
+
+        .button.secondary:hover {
+            background: #5a8bb8;
+        }
+
+        .button.tertiary {
+            background: var(--anthropic-green);
+        }
+
+        .button.tertiary:hover {
+            background: #6b7b52;
+        }
+
+        .button-row {
+            display: flex;
+            gap: 8px;
+        }
+
+        .button-row .button {
+            flex: 1;
+        }
+
+        .status {
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            color: var(--anthropic-mid-gray);
+            margin-top: 12px;
+        }
+
+        /* Canvas Area */
+        .canvas-area {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 0;
+        }
+
+        #canvas-container {
+            width: 100%;
+            /* keep the 4:5 canvas inside the viewport */
+            max-width: min(1000px, calc((100vh - 80px) * 0.8));
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 20px 40px rgba(20, 20, 19, 0.1);
+            background: #04070a;
+        }
+
+        #canvas-container canvas {
+            display: block;
+            width: 100% !important;
+            height: auto !important;
+        }
+
+        /* Loading State */
+        .loading {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            color: var(--anthropic-mid-gray);
+        }
+
+        /* Responsive - Stack on mobile */
+        @media (max-width: 600px) {
+            .container {
+                flex-direction: column;
+            }
+
+            .sidebar {
+                width: 100%;
+            }
+
+            .canvas-area {
+                padding: 20px;
+            }
+
+            #canvas-container {
+                max-width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Control Sidebar -->
+        <div class="sidebar">
+            <h1>002 — Glossa</h1>
+            <div class="subtitle">A 001 traduzida para outra língua: cada cor vale um movimento, cada velocidade vale uma cor. Gramática extraída do GIF da obra anterior.</div>
+
+            <!-- Seed Section -->
+            <div class="control-section">
+                <h3>Seed</h3>
+                <input type="number" id="seed-input" class="seed-input" value="1" onchange="updateSeed()">
+                <div class="seed-controls">
+                    <button class="button secondary" onclick="previousSeed()">← Prev</button>
+                    <button class="button secondary" onclick="nextSeed()">Next →</button>
+                </div>
+                <button class="button tertiary regen-button" onclick="randomSeedAndUpdate()">↻ Random</button>
+            </div>
+
+            <!-- Parameters Section -->
+            <div class="control-section">
+                <h3>Parâmetros</h3>
+
+                <div class="control-group">
+                    <label>Partículas</label>
+                    <div class="slider-container">
+                        <input type="range" id="particles" min="500" max="12000" step="500" value="5000" oninput="updateParam('particles', this.value)">
+                        <span class="value-display" id="particles-value">5000</span>
+                    </div>
+                </div>
+
+                <div class="control-group">
+                    <label>Escala do campo</label>
+                    <div class="slider-container">
+                        <input type="range" id="escala" min="0.5" max="5" step="0.1" value="1.4" oninput="updateParam('escala', this.value)">
+                        <span class="value-display" id="escala-value">1.4</span>
+                    </div>
+                </div>
+
+                <div class="control-group">
+                    <label>Velocidade base</label>
+                    <div class="slider-container">
+                        <input type="range" id="velocidade" min="0.3" max="4" step="0.1" value="1.6" oninput="updateParam('velocidade', this.value)">
+                        <span class="value-display" id="velocidade-value">1.6</span>
+                    </div>
+                </div>
+
+                <div class="control-group">
+                    <label>Desvio de direção (gramática)</label>
+                    <div class="slider-container">
+                        <input type="range" id="desvio" min="0" max="2" step="0.05" value="1" oninput="updateParam('desvio', this.value)">
+                        <span class="value-display" id="desvio-value">1</span>
+                    </div>
+                </div>
+
+                <div class="control-group">
+                    <label>Força de avanço (gramática)</label>
+                    <div class="slider-container">
+                        <input type="range" id="avanco" min="0" max="2" step="0.05" value="0.15" oninput="updateParam('avanco', this.value)">
+                        <span class="value-display" id="avanco-value">0.15</span>
+                    </div>
+                </div>
+
+                <div class="control-group">
+                    <label>Espessura do rastro</label>
+                    <div class="slider-container">
+                        <input type="range" id="weight" min="0.2" max="3" step="0.1" value="0.7" oninput="updateParam('weight', this.value)">
+                        <span class="value-display" id="weight-value">0.7</span>
+                    </div>
+                </div>
+
+                <div class="control-group">
+                    <label>Opacidade do rastro</label>
+                    <div class="slider-container">
+                        <input type="range" id="opacity" min="0.01" max="0.3" step="0.01" value="0.1" oninput="updateParam('opacity', this.value)">
+                        <span class="value-display" id="opacity-value">0.1</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Colors Section: palette extracted from the source GIF -->
+            <div class="control-section">
+                <h3>Paleta medida</h3>
+                <div class="swatches" id="swatches"></div>
+            </div>
+
+            <!-- Actions Section -->
+            <div class="control-section">
+                <h3>Ações</h3>
+                <div class="button-row">
+                    <button class="button" onclick="regenerate()">Redesenhar</button>
+                    <button class="button" onclick="resetParameters()">Reset</button>
+                </div>
+                <div class="button-row" style="margin-top: 8px;">
+                    <button class="button tertiary" onclick="savePNG()">Baixar PNG</button>
+                </div>
+                <div class="status" id="status">—</div>
+            </div>
+        </div>
+
+        <!-- Main Canvas Area -->
+        <div class="canvas-area">
+            <div id="canvas-container">
+                <div class="loading">Inicializando…</div>
+            </div>
+        </div>
+    </div>
+
+    <script src="gramatica.js"></script>
+    <script src="sketch.js"></script>
+</body>
+</html>
