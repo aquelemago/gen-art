@@ -1,0 +1,10 @@
+{
+  "name": "gen-art",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Arte generativa com p5.js — sketches determinísticos por seed",
+  "type": "module",
+  "scripts": {
+    "start": "node ferramentas/servidor.mjs"
+  }
+}
